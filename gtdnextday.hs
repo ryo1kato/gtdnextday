@@ -50,14 +50,16 @@ isIndented (l:ls) = elem l " \t"
 unIndent (l:ls) | isIndented (l:ls) = unIndent ls
                 | otherwise         = (l:ls)
 
-data ItemQuery = RepeatDone | OneShotDone | Any
+data ItemQuery = Repeat | OneShot | RepeatDone | OneShotDone | Any
                  deriving (Eq, Show)
 isItem  ::  ItemQuery -> String -> Bool
 isItem q line@(c1:c2:c3:cs)
     | isIndented line   = isItem q (unIndent line)
+    | q == OneShot      = (c1=='[' && c3==']')
+    | q == Repeat       = (c1=='<' && c3=='>')
     | q == OneShotDone  = isPrefixOf "[X]" line
     | q == RepeatDone   = isPrefixOf "<X>" line
-    | q == Any          = (c1=='[' && c3==']') ||  (c1=='<' && c3=='>')
+    | q == Any          = isItem Repeat line || isItem OneShot line
     | otherwise         = False
 isItem _ _ = False
 
@@ -76,7 +78,7 @@ gtd_nextday_by_line :: [String] -> [String]
 gtd_nextday_by_line []    = []
 gtd_nextday_by_line (l:ls)
     | isItem OneShotDone l = gtd_nextday_by_line (dropWhile (not . isItem Any) ls)
-    | isItem RepeatDone  l = unDone l : (takeWhile (not . isItem Any) ls
+    | isItem Repeat      l = unDone l : (takeWhile (not . isItem Any) ls
                                  ++ gtd_nextday_by_line (dropWhile (not . isItem Any) ls) )
     | otherwise            = l : (takeWhile (not . isItem Any) ls
                                  ++ gtd_nextday_by_line (dropWhile (not . isItem Any) ls) )
@@ -92,6 +94,7 @@ interactWith function inputStream outputStream = do
     datestr <- getDateStringToday
     input <- hGetContents inputStream
     hPutStr outputStream (function datestr input)
+    hFlush outputStream
 
 main = mainWith myFunction
   where mainWith function = do
