@@ -1,0 +1,16 @@
+[ ] oneshot
+[X] oneshot done
+< > repeat
+<.> repeat doing
+<X> repeat done
+    [ ] sublevel oneshot
+    [X] sublevel oneshot done
+    < > sublevel repeat
+    <.> sublevel repeat doing
+    <X> sublevel repeat done
+[ ] oneshot
+    > with some indented text
+    > with another indented text
+[X] oneshot done
+    > done with some indented text
+    > done with another indented text

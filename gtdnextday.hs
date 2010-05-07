@@ -65,7 +65,7 @@ isItem _ _ = False
 
 unDone ::  String -> String
 unDone line@(c1:c2:cs)
-   | isIndented line  = unDone (c2:cs)
+   | isIndented line  = c1 : unDone (c2:cs)
    | otherwise        = (c1:' ':cs)
 
 -------------------------------------------------------------------------------
