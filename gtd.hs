@@ -1,11 +1,49 @@
 --
--- GTD.hs
+-- gtd.hs -- A GTD todo list recycler
 --      2010-05-07 ryo1.kato@gmail.com
 --
+-- > < > repatitive item
+-- > [ ] one-shot item
+-- >     [ ] can be indented
+-- > <X> repatitive item done
+-- > [X] one-shot item done
+-- >
 
 import System.Environment (getArgs)
 import IO
+import Time
+import Locale
 import Data.List
+import Text.Regex
+
+-------------------------------------------------------------------------------
+midnight = 26 ::Int -- Start of a day. 24 to regular clocktime, 26 to 2 a.m.
+dateStrRegex = mkRegex "^20[0-9][0-9]-[01][0-9]-[0-9][0-9]"
+isDateLine :: String -> Bool
+isDateLine line | match == Nothing  = False
+                | otherwise         = True
+                  where match = matchRegex dateStrRegex line
+
+stripDate = drop 10
+
+updateDateLine  ::  String -> String -> String
+updateDateLine line datestr
+    | isDateLine line   = datestr ++ stripDate line
+    | otherwise         = line
+
+myGetClockTime = do
+    now        <- getClockTime
+    return (addToClockTime timediff now)
+    where timediff = TimeDiff 0 0 0 (24-midnight) 0 0 0
+
+getDateStringToday = do
+    nowoffset  <- myGetClockTime
+    nowcaltime <- toCalendarTime(nowoffset)
+    return (getDateString nowcaltime)
+
+getDateString   ::  CalendarTime -> String
+getDateString ct = formatCalendarTime defaultTimeLocale "%Y-%m-%d" ct
+
 
 -------------------------------------------------------------------------------
 isIndented (l:ls) = elem l " \t"
@@ -13,7 +51,7 @@ unIndent (l:ls) | isIndented (l:ls) = unIndent ls
                 | otherwise         = (l:ls)
 
 data ItemQuery = RepeatDone | OneShotDone | Any
-                 deriving (Eq)
+                 deriving (Eq, Show)
 isItem  ::  ItemQuery -> String -> Bool
 isItem q line@(c1:c2:c3:cs)
     | isIndented line   = isItem q (unIndent line)
@@ -23,17 +61,16 @@ isItem q line@(c1:c2:c3:cs)
     | otherwise         = False
 isItem _ _ = False
 
-
-
--------------------------------------------------------------------------------
-
-gtd_nextday ::  String -> String
-gtd_nextday = unlines . gtd_nextday_by_line . lines
-
 unDone ::  String -> String
 unDone line@(c1:c2:cs)
    | isIndented line  = unDone (c2:cs)
    | otherwise        = (c1:' ':cs)
+
+-------------------------------------------------------------------------------
+gtd_nextday ::  String -> String -> String
+gtd_nextday datestr filedata = (updateDateLine l datestr) ++ "\n" ++ (unlines $ gtd_nextday_by_line ls)
+                           where (l:ls) = lines filedata
+
 
 gtd_nextday_by_line :: [String] -> [String]
 gtd_nextday_by_line []    = []
@@ -52,9 +89,9 @@ gtd_nextday_by_line (l:ls)
 --   (stdin, stdout), (arg, stdout), (arg, arg) resp.
 --
 interactWith function inputStream outputStream = do
+    datestr <- getDateStringToday
     input <- hGetContents inputStream
-    hPutStr outputStream (function input)
-
+    hPutStr outputStream (function datestr input)
 
 main = mainWith myFunction
   where mainWith function = do
@@ -70,4 +107,3 @@ main = mainWith myFunction
         --myFunction = id                    -- cat
         --myFunction = unlines.reverse.lines -- tac
         myFunction = gtd_nextday
-
