@@ -47,6 +47,7 @@ getDateString ct = formatCalendarTime defaultTimeLocale "%Y-%m-%d" ct
 
 -------------------------------------------------------------------------------
 isIndented (l:ls) = elem l " \t"
+unIndent []     = []
 unIndent (l:ls) | isIndented (l:ls) = unIndent ls
                 | otherwise         = (l:ls)
 
