@@ -51,18 +51,26 @@ unIndent []     = []
 unIndent (l:ls) | isIndented (l:ls) = unIndent ls
                 | otherwise         = (l:ls)
 
-data ItemQuery = Repeat | OneShot | RepeatDone | OneShotDone | Any
+data ItemQuery = Repeat | OneShot | RepeatDone | OneShotDone | OneShotCancel | Any
                  deriving (Eq, Show)
 isItem  ::  ItemQuery -> String -> Bool
 isItem q line@(c1:c2:c3:cs)
-    | isIndented line   = isItem q (unIndent line)
-    | q == OneShot      = (c1=='[' && c3==']')
-    | q == Repeat       = (c1=='<' && c3=='>')
-    | q == OneShotDone  = isPrefixOf "[X]" line
-    | q == RepeatDone   = isPrefixOf "<X>" line
-    | q == Any          = isItem Repeat line || isItem OneShot line
-    | otherwise         = False
+    | isIndented line    = isItem q (unIndent line)
+    | q == OneShot       = (c1=='[' && c3==']')
+    | q == Repeat        = (c1=='<' && c3=='>')
+    | q == OneShotDone   = isPrefixOf "[X]" line
+    | q == OneShotCancel = isPrefixOf "[-]" line
+    | q == RepeatDone    = isPrefixOf "<X>" line
+    | q == Any           = isItem Repeat line || isItem OneShot line
+    | otherwise          = False
 isItem _ _ = False
+
+-- FIXME: Sofar line begins with non-space char are
+--        item-body; lines, sections
+--        We may want to check indent-level in the future.
+isItemBody :: String -> Bool
+isItemBody []          = False
+isItemBody line@(c:cs) = not (isItem Any line) && c == ' '
 
 unDone ::  String -> String
 unDone line@(c1:c2:cs)
@@ -71,6 +79,7 @@ unDone line@(c1:c2:cs)
 
 -------------------------------------------------------------------------------
 gtd_nextday ::  String -> String -> String
+gtd_nextday _       []       = []
 gtd_nextday datestr filedata = (updateDateLine l datestr) ++ "\n" ++ (unlines $ gtd_nextday_by_line ls)
                            where (l:ls) = lines filedata
 
@@ -78,11 +87,12 @@ gtd_nextday datestr filedata = (updateDateLine l datestr) ++ "\n" ++ (unlines $ 
 gtd_nextday_by_line :: [String] -> [String]
 gtd_nextday_by_line []    = []
 gtd_nextday_by_line (l:ls)
-    | isItem OneShotDone l = gtd_nextday_by_line (dropWhile (not . isItem Any) ls)
-    | isItem Repeat      l = unDone l : (takeWhile (not . isItem Any) ls
-                                 ++ gtd_nextday_by_line (dropWhile (not . isItem Any) ls) )
-    | otherwise            = l : (takeWhile (not . isItem Any) ls
-                                 ++ gtd_nextday_by_line (dropWhile (not . isItem Any) ls) )
+    | isItem OneShotDone l || isItem OneShotCancel l
+                        = gtd_nextday_by_line (dropWhile isItemBody ls)
+    | isItem Repeat l   = unDone l : (takeWhile isItemBody ls
+                                 ++ gtd_nextday_by_line (dropWhile isItemBody ls) )
+    | otherwise         = l : (takeWhile isItemBody ls
+                                 ++ gtd_nextday_by_line (dropWhile isItemBody ls) )
 
 
 -------------------------------------------------------------------------------
