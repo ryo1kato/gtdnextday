@@ -1,6 +1,6 @@
 " Vim syntax file
 " Language: gtd journal
-" Creator:  Ryoichi KATO <ryo1kato@gmail.com>
+" Creator:  Ryoichi KATO <Ryoichi.Kato@jp.sony.com>
 " Just a modified go.vim syntax file
 "
 " gtdj stands for "GTD Journal"
@@ -24,8 +24,8 @@ syn match gtdj_DOUBLE_LINE    display /^=\{8,\}/
 syn match gtdj_LINE           display /^[\(\- \)]*-/
 
 syntax cluster gtdj_emph contains=gtdj_BoldUnderline,gtdj_Bold
-syn match gtdj_BoldUnderline  display /_.*_/
-syn match gtdj_Bold           display /\*[^ ].*\*/
+syn match gtdj_BoldUnderline  display /\<_.*_\>/
+syn match gtdj_Bold           display /\(^\|\s\)\*[^ ].*\*\(\s\|$\)/
 
 syntax region gtdj_Comment start="/\*" end="\*/"
 
