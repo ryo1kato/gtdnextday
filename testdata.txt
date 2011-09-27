@@ -1,3 +1,5 @@
+2011-12-31
+--------------------------------------------
 [ ] oneshot
 [X] oneshot done
 < > repeat
@@ -14,3 +16,5 @@
 [X] oneshot done
     > done with some indented text
     > done with another indented text
+
+vim: filetype=todo
