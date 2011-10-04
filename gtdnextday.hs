@@ -1,13 +1,40 @@
 --
--- gtd.hs -- A GTD todo list recycler
---      2010-05-07 ryo1.kato@gmail.com
+-- gtdnextday.hs -- A GTD todo list recycler
+--      2011-10-04 ryo1kato@gmail.com
 --
--- > < > repatitive item
--- > [ ] one-shot item
--- >     [ ] can be indented
--- > <X> repatitive item done
--- > [X] one-shot item done
--- >
+-- This tiny Haskell program is to manage your text-based
+-- TODO list.
+-- 
+-- The TODO list is just like a bullet list with some twist:
+-- * lines begins with '[ ]' means tasks.
+-- * lines begins with '< >' means reccuring tasks.
+-- * lines begins with '[X]' or '<X>' is completed tasks.
+-- * lines begins with '[-]' or '<->' is completed tasks.
+--
+--     | 2011-12-31  When an ISO format date is at begining of a file,
+--     |             It indicates scope of this to do list.
+--     | < > repatitive item
+--     | [ ] one-shot item
+--     |     [ ] can be indented
+--     |         * this some non-todo items
+--     |           and block quote
+--     |           like this
+--     | <X> completed repatitive item 
+--     | [X] completed one-shot item done
+--
+--  When you processed your TODO list for a day(or week, or month)
+--  and feed the file with this command, then this will generate a
+--  converted output:
+--
+--  * A ISO-date notation at the beginning of the file (if any)
+--    is updated to the current date.
+--  * All non-completed TODOs are stay as it is.
+--  * All completed, reccuring TODOs are cleared.
+--    (revert to 'undone' status; the beginning of line is "< >")
+--  * All completed or canceled TODOs are removed, along with it's memo.
+--    (lines following, until next TODO item.
+--    So far indents are not considered)
+--
 
 import System.Environment (getArgs)
 import IO
@@ -58,9 +85,9 @@ isItem q line@(c1:c2:c3:cs)
     | isIndented line    = isItem q (unIndent line)
     | q == OneShot       = (c1=='[' && c3==']')
     | q == Repeat        = (c1=='<' && c3=='>')
-    | q == OneShotDone   = isPrefixOf "[X]" line
-    | q == OneShotCancel = isPrefixOf "[-]" line
-    | q == RepeatDone    = isPrefixOf "<X>" line
+    | q == OneShotDone   = isPrefixOf "[X]" line || isPrefixOf "[x]" line
+    | q == OneShotCancel = isPrefixOf "[-]" line || isPrefixOf "<->" line
+    | q == RepeatDone    = isPrefixOf "<X>" line || isPrefixOf "<x>" line
     | q == Any           = isItem Repeat line || isItem OneShot line
     | otherwise          = False
 isItem _ _ = False
@@ -85,7 +112,7 @@ gtd_nextday datestr filedata = (updateDateLine l datestr) ++ "\n" ++ (unlines $ 
 
 
 gtd_nextday_by_line :: [String] -> [String]
-gtd_nextday_by_line []    = []
+gtd_nextday_by_line [] = []
 gtd_nextday_by_line (l:ls)
     | isItem OneShotDone l || isItem OneShotCancel l
                         = gtd_nextday_by_line (dropWhile isItemBody ls)
