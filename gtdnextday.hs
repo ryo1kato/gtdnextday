@@ -37,9 +37,9 @@
 --
 
 import System.Environment (getArgs)
-import IO
-import Time
-import Locale
+import System.IO
+import System.Time
+import System.Locale
 import Data.List
 import Text.Regex
 
