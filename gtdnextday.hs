@@ -101,12 +101,11 @@ isItem q line@(c1:c2:c3:cs)
 isItem _ _ = False
 
 isItemBody :: Int -> String -> Bool
-isItemBody indent [] = True
-isItemBody indent line@(c:cs)
-    | indent == 0  = not (isItem Any line)
-    | c == ' '     = isItemBody (indent-1) cs
-    | c == '\t'    = isItemBody (indent-tabwidth) cs
-    | otherwise    = False
+isItemBody indent []   = True
+isItemBody 0      line = not (isItem Any line)
+isItemBody indent line
+    | indent <= countIndent line  = isItemBody 0 (unIndent line)
+    | otherwise                   = False
 
 dropItemBody :: String -> [String] -> [String]
 dropItemBody l ls = dropWhile (isItemBody (countIndent l + 1)) ls
