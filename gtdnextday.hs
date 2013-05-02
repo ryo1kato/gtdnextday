@@ -4,7 +4,7 @@
 --
 -- This tiny Haskell program is to manage your text-based
 -- TODO list.
--- 
+--
 -- The TODO list is just like a bullet list with some twist:
 -- * lines begins with '[ ]' means tasks.
 -- * lines begins with '< >' means reccuring tasks.
@@ -44,6 +44,7 @@ import Data.List
 import Text.Regex
 
 -------------------------------------------------------------------------------
+tabwidth = 4 ::Int
 midnight = 26 ::Int -- Start of a day. 24 to regular clocktime, 26 to 2 a.m.
 dateStrRegex = mkRegex "^20[0-9][0-9]-[01][0-9]-[0-9][0-9]"
 isDateLine :: String -> Bool
@@ -73,10 +74,17 @@ getDateString ct = formatCalendarTime defaultTimeLocale "%Y-%m-%d" ct
 
 
 -------------------------------------------------------------------------------
-isIndented (l:ls) = elem l " \t"
+countIndent :: String -> Int
+countIndent []   = 0
+countIndent (c:cs)
+    | c  == ' '  = 1 + countIndent cs
+    | c  == '\t' = tabwidth + countIndent cs
+    | otherwise  = 0
+
+isIndented (c:cs) = elem c " \t"
 unIndent []     = []
-unIndent (l:ls) | isIndented (l:ls) = unIndent ls
-                | otherwise         = (l:ls)
+unIndent (c:cs) | isIndented (c:cs) = unIndent cs
+                | otherwise         = (c:cs)
 
 data ItemQuery = Repeat | OneShot | RepeatDone | OneShotDone | OneShotCancel | Any
                  deriving (Eq, Show)
@@ -92,12 +100,16 @@ isItem q line@(c1:c2:c3:cs)
     | otherwise          = False
 isItem _ _ = False
 
--- FIXME: Sofar line begins with non-space char are
---        item-body; lines, sections
---        We may want to check indent-level in the future.
-isItemBody :: String -> Bool
-isItemBody []          = False
-isItemBody line@(c:cs) = not (isItem Any line) && c == ' '
+isItemBody :: Int -> String -> Bool
+isItemBody indent [] = True
+isItemBody indent line@(c:cs)
+    | indent == 0  = not (isItem Any line)
+    | c == ' '     = isItemBody (indent-1) cs
+    | c == '\t'    = isItemBody (indent-tabwidth) cs
+    | otherwise    = False
+
+dropItemBody :: String -> [String] -> [String]
+dropItemBody l ls = dropWhile (isItemBody (countIndent l + 1)) ls
 
 unDone ::  String -> String
 unDone line@(c1:c2:cs)
@@ -115,11 +127,11 @@ gtd_nextday_by_line :: [String] -> [String]
 gtd_nextday_by_line [] = []
 gtd_nextday_by_line (l:ls)
     | isItem OneShotDone l || isItem OneShotCancel l
-                        = gtd_nextday_by_line (dropWhile isItemBody ls)
-    | isItem Repeat l   = unDone l : (takeWhile isItemBody ls
-                                 ++ gtd_nextday_by_line (dropWhile isItemBody ls) )
-    | otherwise         = l : (takeWhile isItemBody ls
-                                 ++ gtd_nextday_by_line (dropWhile isItemBody ls) )
+                        = gtd_nextday_by_line (dropItemBody l ls)
+    | isItem Repeat l   = unDone l : (takeWhile (isItemBody 0) ls
+                                 ++ gtd_nextday_by_line (dropWhile (isItemBody 0) ls) )
+    | otherwise         = l : (takeWhile (isItemBody 0) ls
+                                 ++ gtd_nextday_by_line (dropWhile (isItemBody 0) ls) )
 
 
 -------------------------------------------------------------------------------
