@@ -42,6 +42,7 @@ import System.Time
 import System.Locale
 import Data.List
 import Text.Regex
+import Data.Maybe
 
 -------------------------------------------------------------------------------
 tabwidth = 4 ::Int
@@ -74,8 +75,9 @@ getDateString ct = formatCalendarTime defaultTimeLocale "%Y-%m-%d" ct
 
 
 -------------------------------------------------------------------------------
+-- FIXME line with white space only should be indent == 0
 countIndent :: String -> Int
-countIndent []   = 0
+countIndent []   = 99999
 countIndent (c:cs)
     | c  == ' '  = 1 + countIndent cs
     | c  == '\t' = tabwidth + countIndent cs
@@ -86,7 +88,16 @@ unIndent []     = []
 unIndent (c:cs) | isIndented (c:cs) = unIndent cs
                 | otherwise         = (c:cs)
 
-data ItemQuery = Repeat | OneShot | RepeatDone | OneShotDone | OneShotCancel | Any
+minIndent :: Int -> String -> Bool
+minIndent 0      line = True
+minIndent indent line
+    | indent <= countIndent line = True
+    | otherwise                  = False
+
+
+-------------------------------------------------------------------------------
+data ItemQuery = Repeat | OneShot | RepeatDone | OneShotDone | Cancelled | AnyItem | Body | ToRemove
+ | ToKeep | ToUndo
                  deriving (Eq, Show)
 isItem  ::  ItemQuery -> String -> Bool
 isItem q line@(c1:c2:c3:cs)
@@ -94,43 +105,74 @@ isItem q line@(c1:c2:c3:cs)
     | q == OneShot       = (c1=='[' && c3==']')
     | q == Repeat        = (c1=='<' && c3=='>')
     | q == OneShotDone   = isPrefixOf "[X]" line || isPrefixOf "[x]" line
-    | q == OneShotCancel = isPrefixOf "[-]" line || isPrefixOf "<->" line
+    | q == Cancelled     = isPrefixOf "[-]" line -- || isPrefixOf "<->" line
     | q == RepeatDone    = isPrefixOf "<X>" line || isPrefixOf "<x>" line
-    | q == Any           = isItem Repeat line || isItem OneShot line
-    | otherwise          = False
+    | q == AnyItem       = isItem Repeat line || isItem OneShot line
+    | q == Body          = not (isItem AnyItem line)
+    | q == ToRemove      = isItem OneShotDone line || isItem Cancelled line
+    | q == ToKeep        = isItem AnyItem line && not (isItem ToRemove line)
+    | q == ToUndo        = isItem RepeatDone line || isItem Cancelled line
 isItem _ _ = False
 
-isItemBody :: Int -> String -> Bool
-isItemBody indent []   = True
-isItemBody 0      line = not (isItem Any line)
-isItemBody indent line
-    | indent <= countIndent line  = isItemBody 0 (unIndent line)
-    | otherwise                   = False
 
-dropItemBody :: String -> [String] -> [String]
-dropItemBody l ls = dropWhile (isItemBody (countIndent l + 1)) ls
-
-unDone ::  String -> String
-unDone line@(c1:c2:cs)
-   | isIndented line  = c1 : unDone (c2:cs)
+unDo_ ::  String -> String
+unDo_ line@(c1:c2:cs)
+   | isIndented line  = c1 : unDo_ (c2:cs)
    | otherwise        = (c1:' ':cs)
+
+
+unDo :: String -> String
+unDo line
+    | isItem ToUndo line = unDo_ line
+    | otherwise          = line
+
+
+moreIndentThan line = minIndent (1 + countIndent line)
+
+
+gtdSubItemParse :: Bool -> [String] -> Maybe [String]
+gtdSubItemParse _ [] = Nothing
+gtdSubItemParse isdone (l:ls)
+    | isItem ToRemove l = case gtdSubItemTraverse True ls of
+            Nothing  -> Nothing
+            Just sub -> Just (l:sub)
+    | isItem ToKeep l   = case gtdSubItemTraverse False ls of
+            Nothing  -> Just [unDo l]
+            Just sub -> Just ((unDo l):sub)
+    | otherwise         = case gtdSubItemTraverse isdone ls of
+            Nothing  -> if isdone then Nothing else Just [l]
+            Just sub -> if isdone then Just sub else Just (l:sub)
+
+
+gtdSubItemTraverse :: Bool -> [String] -> Maybe [String]
+gtdSubItemTraverse _ [] = Nothing
+gtdSubItemTraverse isdone (l:ls) =
+    catMaybesOrNothing [head, tail]
+    where head = gtdSubItemParse    isdone $ l:takeWhile (moreIndentThan l) ls
+          tail = gtdSubItemTraverse isdone $   dropWhile (moreIndentThan l) ls
+
+-- FIXME: more sophisticated way?
+catMaybesOrNothing :: [Maybe [String]] -> Maybe [String]
+catMaybesOrNothing maybelist = case cat of
+    [ ]       -> Nothing
+    otherwise -> Just cat
+    where cat = concat $ catMaybes maybelist
+
+
+gtdNextDay ls = case gtdSubItemTraverse False ls of
+    Nothing -> []
+    Just ls -> ls
+
+
 
 -------------------------------------------------------------------------------
 gtd_nextday ::  String -> String -> String
-gtd_nextday _       []       = []
-gtd_nextday datestr filedata = (updateDateLine l datestr) ++ "\n" ++ (unlines $ gtd_nextday_by_line ls)
-                           where (l:ls) = lines filedata
+gtd_nextday _ []             = []
+gtd_nextday datestr filedata = (updateDateLine l datestr)
+                                ++  "\n"
+                                ++ (unlines $ gtdNextDay ls)
+                                where (l:ls) = lines filedata
 
-
-gtd_nextday_by_line :: [String] -> [String]
-gtd_nextday_by_line [] = []
-gtd_nextday_by_line (l:ls)
-    | isItem OneShotDone l || isItem OneShotCancel l
-                        = gtd_nextday_by_line (dropItemBody l ls)
-    | isItem Repeat l   = unDone l : (takeWhile (isItemBody 0) ls
-                                 ++ gtd_nextday_by_line (dropWhile (isItemBody 0) ls) )
-    | otherwise         = l : (takeWhile (isItemBody 0) ls
-                                 ++ gtd_nextday_by_line (dropWhile (isItemBody 0) ls) )
 
 
 -------------------------------------------------------------------------------
