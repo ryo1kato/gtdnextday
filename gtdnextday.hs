@@ -8,8 +8,8 @@
 -- The TODO list is just like a bullet list with some twist:
 -- * lines begins with '[ ]' means tasks.
 -- * lines begins with '< >' means reccuring tasks.
--- * lines begins with '[X]' or '<X>' is completed tasks.
--- * lines begins with '[-]' or '<->' is completed tasks.
+-- * lines begins with '[X]' or '<X>' are completed tasks.
+-- * lines begins with '[-]' or '<->' are completed tasks.
 --
 --     | 2011-12-31  When an ISO format date is at begining of a file,
 --     |             It indicates scope of this to do list.
@@ -22,7 +22,7 @@
 --     | <X> completed repatitive item 
 --     | [X] completed one-shot item done
 --
---  When you processed your TODO list for a day(or week, or month)
+--  When you processed your TODO list for a day (or week, or month)
 --  and feed the file with this command, then this will generate a
 --  converted output:
 --
