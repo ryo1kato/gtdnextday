@@ -3,11 +3,9 @@
 : ${EDITOR:=vim}
 
 journal_dir="$HOME/usr/var/journal"
-#gtdnextday_hs="$HOME/src/gtdnextday/gtdnextday.hs"  # for Cygin/runghc
-#gtdnextday_exe="$HOME/src/gtdnextday/gtdnextday"  # for Linux/ghc precompiled
-gtdnextday_exe="$HOME/src/gtdnextday/gtdnextday"
+gtdnextday_hs="$HOME/src/gtdnextday/gtdnextday.hs"  # for Cygin/runghc
 
-conf_use_gui () { false; }
+conf_use_gui () { true; }
 
 cygwin_editor () {
     export HOME="$HOMEPATH"
@@ -20,7 +18,7 @@ gtdnextday ()
     # gtdnextday_hs="`cygpath -m $gtdnextday_hs`"
     # runghc "$gtdnextday_hs" "$(cygpath -w "$1")" "$(cygpath -w "$2")"
 
-    "$HOME/Software/gtdnextday/gtdnextday" "$@"
+    command gtdnextday "$@"
 }
 
 #############################################################
@@ -109,7 +107,7 @@ then
     fi
 fi
 MSG "Start editing $todays_journal"
-ln -sf "$todays_journal" "$journal_dir/today.txt"
+#ln -sf "$todays_journal" "$journal_dir/today.txt"
 
 if use_gui 
 then
